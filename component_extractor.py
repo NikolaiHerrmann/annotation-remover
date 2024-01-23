@@ -17,6 +17,7 @@ class ComponentExtractor:
         self.min_dim = min_dim
         self.img_draw = []
         self.model = tf.keras.models.load_model("my_model.keras")
+        self.num_chars = 5
 
     def predict(self, img, dim=(30, 30)):
         img = cv2.resize(img, dim, interpolation=cv2.INTER_NEAREST)
@@ -25,6 +26,7 @@ class ComponentExtractor:
     def extract(self, img_path):
         self.img_org = cv2.imread(img_path)
         self.img_gray = cv2.cvtColor(self.img_org, cv2.COLOR_BGR2GRAY)
+        self.img_crop = self.img_org.copy()
         
         #self.img_bin = cv2.threshold(self.img_gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
         self.img_bin = 255 - (255 * (self.img_gray >= threshold_sauvola(self.img_gray)).astype(np.uint8))
@@ -47,7 +49,7 @@ class ComponentExtractor:
         if show:
             fig, ax = plt.subplots(1, 3)
             ax[0].imshow(self.img_org)
-            ax[1].imshow(self.cols)
+            ax[1].imshow(self.img_crop)
             ax[2].imshow(self.rows, cmap="gray")
             plt.show()
 
@@ -60,20 +62,32 @@ class ComponentExtractor:
         rows_sums = self.rows.sum(axis=1)
 
         cols_best_line = np.argmax(cols_sums)
-        cols_best_count = cols_sums[cols_best_line]
+        cols_best_count = cols_sums[cols_best_line] / 255
         rows_best_line = np.argmax(rows_sums)
-        rows_best_count = rows_sums[rows_best_line]
+        rows_best_count = rows_sums[rows_best_line] / 255
 
-        print(cols_best_count, rows_best_count)
+        if max(rows_best_count, cols_best_count) < (self.num_chars * 2):
+            print("No annotation found")
+            return
 
+        axis, is_row, dim = (self.rows, True, height) if rows_best_count > cols_best_count else (self.cols, False, width)
+
+        # draw lines to find contour (not for debug)
         cv2.line(self.cols, (cols_best_line, 0), (cols_best_line, height - 1), (255, 255, 255), 3)
         cv2.line(self.rows, (0, rows_best_line), (width - 1, rows_best_line), (255, 255, 255), 3)
-
-        axis = self.rows if rows_best_count > cols_best_count else self.cols
 
         contours, _ = cv2.findContours(axis, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         largest_contour = max(contours, key = cv2.contourArea)
         contour_x, contour_y, contour_width, contour_height = cv2.boundingRect(largest_contour)
+
+        min_lines = contour_y, contour_y + contour_height if is_row else contour_x, contour_x + contour_width
+        min_lines = np.array(min_lines)
+        cut_line_idx = np.argmin(np.abs(min_lines - (dim / 2)))
+        cut_line = min_lines[cut_line_idx]
+
+        min_idx, max_idx = (cut_line, dim) if (dim / 2) > cut_line else (0, cut_line)
+
+        self.img_crop = self.img_crop[min_idx:max_idx, :] if is_row else self.img_crop[:, min_idx:max_idx]
 
         if self.verbose:
             cv2.rectangle(self.img_org, (contour_x, contour_y),
@@ -125,8 +139,8 @@ class ComponentExtractor:
 
 if __name__ == "__main__":
     path ="../datasets/annotations/IRHT_P_002497_ant.tif"
-    path = "../datasets/ICDAR2017_CLaMM_Training/B721816101_MS0180_0010_1.tif"
-    #path = "../ICDAR2017_CLaMM_task2_task4/315556101_MS0894_0066.jpg"
+    path = "../datasets/ICDAR2017_CLaMM_Training/IRHT_P_002167.tif" #IRHT_P_002753.tif"
+    #path = "../ICDAR2017_CLaMM_task2_task4/315556101_MS0894_0104.jpg"
     comp_extract = ComponentExtractor(verbose=True)
     comp_extract.extract(path)
     img = comp_extract.get_drawing()
