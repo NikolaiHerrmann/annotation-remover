@@ -4,7 +4,7 @@ import numpy as np
 import glob
 import cv2
 import matplotlib.pyplot as plt
-from component_extractor import ComponentExtractor
+from annotation_remover import ComponentExtractor
 from tqdm import tqdm
 import random
 
