@@ -155,13 +155,17 @@ class AnnotationRemover:
     
 
 if __name__ == "__main__":
-    path ="../datasets/annotations/IRHT_P_002497_ant.tif"
-    path = "../datasets/ICDAR2017_CLaMM_Training/IRHT_P_001802.tif" #IRHT_P_002753.tif #IRHT_P_002753.tif"
+    import glob
+    import random
 
-    model = AnnotationClassifier()
-    component_extractor = ComponentExtractor(path)
-    annotation_remover = AnnotationRemover(component_extractor, model)
-    cropped_img = annotation_remover.remove()
+    img_ls = glob.glob("../datasets/ICDAR2017_CLaMM_Training/*.*")
+    random.shuffle(img_ls)
 
-    annotation_remover.get_debug_drawing()
+    for img_path in img_ls:
+        model = AnnotationClassifier()
+        component_extractor = ComponentExtractor(img_path)
+        annotation_remover = AnnotationRemover(component_extractor, model, plot=True, verbose=True)
+        cropped_img = annotation_remover.remove()
+
+        annotation_remover.get_debug_drawing()
 

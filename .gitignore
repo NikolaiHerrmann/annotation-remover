@@ -3,3 +3,6 @@ imgs/
 *.txt
 extra/
 *.keras
+*.png
+*.pdf
+*.json
