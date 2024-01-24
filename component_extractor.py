@@ -10,14 +10,15 @@ from tqdm import tqdm
 
 class ComponentExtractor:
 
-    def __init__(self, min_area=100, max_area=5000, min_dim=10, verbose=False):
+    def __init__(self, num_chars, min_area=100, max_area=5000, min_dim=10, verbose=False, plot=True):
         self.verbose = verbose
+        self.plot = plot
         self.min_area = min_area
         self.max_area = max_area
         self.min_dim = min_dim
         self.img_draw = []
         self.model = tf.keras.models.load_model("my_model.keras")
-        self.num_chars = 5
+        self.num_chars = num_chars
 
     def predict(self, img, dim=(30, 30)):
         img = cv2.resize(img, dim, interpolation=cv2.INTER_NEAREST)
@@ -47,10 +48,11 @@ class ComponentExtractor:
         #     return None
         
         if show:
-            fig, ax = plt.subplots(1, 3)
+            fig, ax = plt.subplots(1, 4)
             ax[0].imshow(self.img_org)
             ax[1].imshow(self.img_crop)
             ax[2].imshow(self.rows, cmap="gray")
+            ax[3].imshow(self.img_comps, cmap="gray")
             plt.show()
 
         return self.cols
@@ -66,16 +68,19 @@ class ComponentExtractor:
         rows_best_line = np.argmax(rows_sums)
         rows_best_count = rows_sums[rows_best_line] / 255
 
+        # times 2 since we have two sets of parallel lines for a rect bounding box
         if max(rows_best_count, cols_best_count) < (self.num_chars * 2):
-            print("No annotation found")
-            return
+            if self.verbose:
+                print("No annotation found")
+            return self.img_crop
 
         axis, is_row, dim = (self.rows, True, height) if rows_best_count > cols_best_count else (self.cols, False, width)
 
         # draw lines to find contour (not for debug)
-        cv2.line(self.cols, (cols_best_line, 0), (cols_best_line, height - 1), (255, 255, 255), 3)
-        cv2.line(self.rows, (0, rows_best_line), (width - 1, rows_best_line), (255, 255, 255), 3)
+        cv2.line(self.cols, (cols_best_line, 0), (cols_best_line, height - 1), (255, 255, 255), 1)
+        cv2.line(self.rows, (0, rows_best_line), (width - 1, rows_best_line), (255, 255, 255), 1)
 
+        # find largest contour
         contours, _ = cv2.findContours(axis, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         largest_contour = max(contours, key = cv2.contourArea)
         contour_x, contour_y, contour_width, contour_height = cv2.boundingRect(largest_contour)
@@ -89,18 +94,22 @@ class ComponentExtractor:
 
         self.img_crop = self.img_crop[min_idx:max_idx, :] if is_row else self.img_crop[:, min_idx:max_idx]
 
-        if self.verbose:
+        if self.plot:
             cv2.rectangle(self.img_org, (contour_x, contour_y),
                           (contour_x + contour_width, contour_y + contour_height), (0, 255, 0), 3)
+            
+        return self.img_crop
 
 
     def _get_comp_imgs(self):
-        # make this faster and don't store
+        # storing all comps can max out memory
         comp_ls = []
   
-        if self.verbose:
-            self.cols = np.zeros(self.img_bin.shape, dtype=np.uint8)
-            self.rows = np.zeros(self.img_bin.shape, dtype=np.uint8)
+        self.cols = np.zeros(self.img_bin.shape, dtype=np.uint8)
+        self.rows = np.zeros(self.img_bin.shape, dtype=np.uint8)
+
+        if self.plot:
+            self.img_comps = np.zeros(self.img_bin.shape, dtype=np.uint8)
         
         for i in range(1, self.total_comp): 
             
@@ -120,7 +129,9 @@ class ComponentExtractor:
                 #comp_ls.append(comp_img)
                 prediction = (self.predict(comp_img).numpy() > 0.5)[0]
                 if not prediction:
-                    #self.img_draw = cv2.bitwise_or(self.img_draw, comp_mask)
+
+                    if self.plot:
+                        self.img_comps = cv2.bitwise_or(self.img_comps, comp_mask)
                     #cv2.rectangle(self.img_draw, (x, y), (x + width, y + height), (255, 255, 255), 1)
 
                     cv2.line(self.cols, (x, y), (x+width, y), (255, 255, 255), 1)
@@ -139,7 +150,7 @@ class ComponentExtractor:
 
 if __name__ == "__main__":
     path ="../datasets/annotations/IRHT_P_002497_ant.tif"
-    path = "../datasets/ICDAR2017_CLaMM_Training/IRHT_P_002167.tif" #IRHT_P_002753.tif"
+    path = "../datasets/ICDAR2017_CLaMM_Training/IRHT_P_002307.tif" #IRHT_P_002753.tif"
     #path = "../ICDAR2017_CLaMM_task2_task4/315556101_MS0894_0104.jpg"
     comp_extract = ComponentExtractor(verbose=True)
     comp_extract.extract(path)
