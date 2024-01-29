@@ -1,4 +1,5 @@
 
+import util
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,10 +12,10 @@ class AnnotationClassifier:
     def __init__(self, model_path="my_model.keras"):
         self.model = tf.keras.models.load_model(model_path)
 
-    def predict(self, img, dim=(30, 30)):
+    def predict(self, img, dim=(31, 31)):
         img = cv2.resize(img, dim, interpolation=cv2.INTER_NEAREST)
         prediction = self.model((img / 255).reshape(1, *dim, 1))[0]
-        return not (prediction.numpy() > 0.5)[0]
+        return (prediction.numpy() > 0.5)[0]
 
 
 class ComponentExtractor:
@@ -162,7 +163,7 @@ if __name__ == "__main__":
     random.shuffle(img_ls)
 
     for img_path in img_ls:
-        model = AnnotationClassifier()
+        model = AnnotationClassifier(model_path="my_model_3.keras")
         component_extractor = ComponentExtractor(img_path)
         annotation_remover = AnnotationRemover(component_extractor, model, plot=True, verbose=True)
         cropped_img = annotation_remover.remove()
