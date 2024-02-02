@@ -1,20 +1,23 @@
 
-import util
+from util import plt_save
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage.filters import threshold_sauvola
 import tensorflow as tf
+from train import resize_img, DIM
 
 
 class AnnotationClassifier:
 
-    def __init__(self, model_path="my_model.keras"):
+    def __init__(self, model_path, dim, pad):
         self.model = tf.keras.models.load_model(model_path)
+        self.dim = dim
+        self.pad = pad
 
-    def predict(self, img, dim=(31, 31)):
-        img = cv2.resize(img, dim, interpolation=cv2.INTER_NEAREST)
-        prediction = self.model((img / 255).reshape(1, *dim, 1))[0]
+    def predict(self, img):
+        img = resize_img(img, size=self.dim, pad=self.pad)
+        prediction = self.model(img.reshape(1, self.dim, self.dim, 1))[0]
         return (prediction.numpy() > 0.5)[0]
 
 
@@ -73,7 +76,7 @@ class AnnotationRemover:
         if self.plot:
             self.img_draw = self.img_crop.copy()
 
-    def get_debug_drawing(self, show=True):
+    def get_debug_drawing(self, show=True, extra_show=True):
         if not self.plot or self.rows is None:
             print("No plot available!")
             return
@@ -88,6 +91,14 @@ class AnnotationRemover:
 
         if show:
             plt.show()
+
+        if extra_show:
+            fig, ax = plt.subplots(1, 2)
+            ax[0].imshow(self.img_draw)
+            ax[0].set_title("Detected Annotation")
+            ax[1].imshow(self.img_crop)
+            ax[1].set_title("Cropped Image")
+            plt_save("example")
     
     def _find_crop_line(self):
         height, width = self.cols.shape
@@ -158,15 +169,22 @@ class AnnotationRemover:
 if __name__ == "__main__":
     import glob
     import random
+    from multiprocessing import Pool
 
     img_ls = glob.glob("../datasets/ICDAR2017_CLaMM_Training/*.*")
     random.shuffle(img_ls)
 
-    for img_path in img_ls:
-        model = AnnotationClassifier(model_path="my_model_3.keras")
+    def run(img_path):
+        model = AnnotationClassifier("remover_model_v1.keras", DIM, False)
         component_extractor = ComponentExtractor(img_path)
         annotation_remover = AnnotationRemover(component_extractor, model, plot=True, verbose=True)
         cropped_img = annotation_remover.remove()
 
         annotation_remover.get_debug_drawing()
+
+    for path in img_ls:
+        run(path)
+    # path = "../datasets/CLaMM_Clean_Training/IRHT_P_005258.tif"
+    # run(path)
+        
 

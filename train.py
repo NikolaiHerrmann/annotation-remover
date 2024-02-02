@@ -14,12 +14,36 @@ import json
 import os
 
 
-def read_img(img_path, dim=(31, 31)):
+DIM = 31
+PAD = True
+
+
+def resize_img(img, size=DIM, pad=PAD):
+    if not pad:
+        img = cv2.resize(img, (size, size), interpolation=cv2.INTER_NEAREST)
+    else:
+        height, width = img.shape
+        max_dim = np.max(img.shape)
+        factor = size / max_dim
+
+        img = cv2.resize(img, (0, 0), fx=factor, fy=factor, interpolation=cv2.INTER_NEAREST)
+        height, width = img.shape
+
+        img_padded = np.zeros((size, size), dtype=np.uint8)
+        offset_y = (size - height) // 2
+        offset_x = (size - width) // 2
+        img_padded[offset_y:offset_y+height, offset_x:offset_x+width] = img
+        img = img_padded
+
+    img = img / 255
+
+    return img
+
+
+def read_img(img_path):
     img = cv2.imread(img_path)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    img = cv2.resize(img, dim, interpolation=cv2.INTER_NEAREST)
-    img = img / 255
-    return img
+    return resize_img(img)
 
 
 def get_model():
@@ -63,8 +87,7 @@ def run_model(X_train, X_val, y_train, y_val, plot_loss=False):
     model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.001), loss='binary_crossentropy', metrics=["accuracy"])
 
     callback = keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
-    history = model.fit(X_train, y_train, epochs=20, shuffle=True, validation_data=(X_val, y_val),
-                        batch_size=64, callbacks=[callback])
+    history = model.fit(X_train, y_train, epochs=20, shuffle=True, validation_data=(X_val, y_val), batch_size=64, callbacks=[callback])
     
     y_val_pred = model.predict(X_val)
     y_val_pred = (y_val_pred > 0.5).astype(np.int64)
@@ -77,20 +100,19 @@ def run_model(X_train, X_val, y_train, y_val, plot_loss=False):
     print(scores)
     
     if plot_loss:
-        model.save("remover_model_v1.keras")
-        loss = history.history['loss']
-        val_loss = history.history['val_loss']
-        json.dump(history.history, open("history.json", "w"), indent=4)
+        model.save("remover_model_v1_pad.keras")
+        # loss = history.history['loss']
+        # val_loss = history.history['val_loss']
+        # json.dump(history.history, open("history.json", "w"), indent=4)
 
-        plt.plot(loss, label="Training Loss")
-        plt.plot(val_loss, label="Validation Loss")
-        plt.title("Annotation Remover Loss Curve")
-        plt.legend
-        plt.legend()
+        # plt.plot(loss, label="Training Loss")
+        # plt.plot(val_loss, label="Validation Loss")
+        # plt.title("Annotation Remover Loss Curve")
+        # plt.legend()
 
-        name = "loss_curve"
-        plt.savefig(name + ".png", dpi=300, bbox_inches="tight")
-        plt.savefig(name + ".pdf", bbox_inches="tight")
+        # name = "loss_curve"
+        # plt.savefig(name + ".png", dpi=300, bbox_inches="tight")
+        # plt.savefig(name + ".pdf", bbox_inches="tight")
 
     return scores
 
@@ -116,7 +138,7 @@ def run_kfold(X, y):
 if __name__ == "__main__":
     X, y = load_data("imgs", is_train=True)
 
-    run_kfold(X, y)
+    #run_kfold(X, y)
 
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.1, random_state=SEED, stratify=y)
     run_model(X_train, X_val, y_train, y_val, plot_loss=True)
