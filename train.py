@@ -65,6 +65,11 @@ def get_model():
     return model
 
 
+def get_summary(model):
+    with open("model_summary.txt", "w") as f:
+        model.summary(print_fn=lambda x: f.write(x + "\n"))
+
+
 def load_data(path, is_train):
     set_type = "train" if is_train else "test"
     ant_ls = glob.glob(os.path.join(path, set_type, "ant/*"))
@@ -101,18 +106,20 @@ def run_model(X_train, X_val, y_train, y_val, plot_loss=False):
     
     if plot_loss:
         model.save("remover_model_v1_pad.keras")
-        # loss = history.history['loss']
-        # val_loss = history.history['val_loss']
-        # json.dump(history.history, open("history.json", "w"), indent=4)
+        loss = history.history['loss']
+        val_loss = history.history['val_loss']
+        json.dump(history.history, open("history.json", "w"), indent=4)
 
-        # plt.plot(loss, label="Training Loss")
-        # plt.plot(val_loss, label="Validation Loss")
-        # plt.title("Annotation Remover Loss Curve")
-        # plt.legend()
+        plt.plot(loss, label="Training")
+        plt.plot(val_loss, label="Validation")
+        plt.xlabel("Epoch")
+        plt.ylabel("Binary Cross Entropy")
+        plt.title("Annotation Remover Loss Curve")
+        plt.legend()
 
-        # name = "loss_curve"
-        # plt.savefig(name + ".png", dpi=300, bbox_inches="tight")
-        # plt.savefig(name + ".pdf", bbox_inches="tight")
+        name = "loss_curve_2"
+        plt.savefig(name + ".png", dpi=300, bbox_inches="tight")
+        plt.savefig(name + ".pdf", bbox_inches="tight")
 
     return scores
 
@@ -138,7 +145,7 @@ def run_kfold(X, y):
 if __name__ == "__main__":
     X, y = load_data("imgs", is_train=True)
 
-    #run_kfold(X, y)
+    run_kfold(X, y)
 
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.1, random_state=SEED, stratify=y)
     run_model(X_train, X_val, y_train, y_val, plot_loss=True)

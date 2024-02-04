@@ -17,7 +17,7 @@ class AnnotationClassifier:
 
     def predict(self, img):
         img = resize_img(img, size=self.dim, pad=self.pad)
-        prediction = self.model(img.reshape(1, self.dim, self.dim, 1))[0]
+        prediction = self.model(img.reshape(1, self.dim, self.dim, 1), training=False)[0]
         return (prediction.numpy() > 0.5)[0]
 
 
@@ -93,12 +93,14 @@ class AnnotationRemover:
             plt.show()
 
         if extra_show:
-            fig, ax = plt.subplots(1, 2)
-            ax[0].imshow(self.img_draw)
-            ax[0].set_title("Detected Annotation")
-            ax[1].imshow(self.img_crop)
-            ax[1].set_title("Cropped Image")
-            plt_save("example")
+            fig, ax = plt.subplots(1, 3, figsize=(15, 8))
+            ax[0].imshow(self.img_comps, cmap="gray")
+            ax[0].set_title("Detected Annotations")
+            ax[1].imshow(self.rows, cmap="gray")
+            ax[1].set_title("Max horizontal pass through")
+            ax[2].imshow(self.cols, cmap="gray")
+            ax[2].set_title("Max vertical pass through")
+            plt_save("debug")
     
     def _find_crop_line(self):
         height, width = self.cols.shape
@@ -169,22 +171,36 @@ class AnnotationRemover:
 if __name__ == "__main__":
     import glob
     import random
+    import os
     from multiprocessing import Pool
 
-    img_ls = glob.glob("../datasets/ICDAR2017_CLaMM_Training/*.*")
-    random.shuffle(img_ls)
+    PLOT = False
 
-    def run(img_path):
-        model = AnnotationClassifier("remover_model_v1.keras", DIM, False)
+    img_ls = glob.glob("../datasets/ICDAR2017_CLaMM_Training/*.tif")
+    
+    if PLOT:
+        random.shuffle(img_ls)
+    else:
+        clean_img_path = "../datasets/CLaMM_Training_Clean"
+        os.mkdir(clean_img_path)
+
+    def run(img_path, plot=False):
+        model = AnnotationClassifier("remover_model_v1_pad.keras", DIM, True)
         component_extractor = ComponentExtractor(img_path)
-        annotation_remover = AnnotationRemover(component_extractor, model, plot=True, verbose=True)
+        annotation_remover = AnnotationRemover(component_extractor, model, plot=plot, verbose=True)
         cropped_img = annotation_remover.remove()
 
-        annotation_remover.get_debug_drawing()
+        if plot:
+            annotation_remover.get_debug_drawing()
+        else:
+            file_name = os.path.basename(img_path)
+            cv2.imwrite(os.path.join(clean_img_path, file_name), cropped_img)
 
-    for path in img_ls:
-        run(path)
-    # path = "../datasets/CLaMM_Clean_Training/IRHT_P_005258.tif"
-    # run(path)
-        
+    if PLOT:
+        path = "../datasets/CLaMM_Training_Clean/IRHT_P_007689.tif"
+        #for path in img_ls:
+        run(path, plot=True)
+    else:
+        with Pool() as pool:
+            pool.map(run, img_ls)       
 
