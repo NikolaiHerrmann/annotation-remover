@@ -172,17 +172,24 @@ if __name__ == "__main__":
     import glob
     import random
     import os
+    import shutil
     from multiprocessing import Pool
 
     PLOT = False
 
-    img_ls = glob.glob("../datasets/ICDAR2017_CLaMM_Training/*.tif")
+    path = "../datasets/ICDAR2017_CLaMM_task1_task3"
+    img_ls = glob.glob(os.path.join(path, "*.tif"))
+    csv_ls = glob.glob(os.path.join(path, "*.csv"))
     
     if PLOT:
         random.shuffle(img_ls)
     else:
-        clean_img_path = "../datasets/CLaMM_Training_Clean"
-        os.mkdir(clean_img_path)
+        clean_img_path = "../datasets/CLaMM_task1_task3_Clean"
+        os.makedirs(clean_img_path, exist_ok=False)
+        
+        assert len(csv_ls) == 1
+        csv_name = os.path.basename(csv_ls[0])
+        shutil.copy(csv_ls[0], os.path.join(clean_img_path, csv_name))
 
     def run(img_path, plot=False):
         model = AnnotationClassifier("remover_model_v1_pad.keras", DIM, True)
@@ -197,9 +204,8 @@ if __name__ == "__main__":
             cv2.imwrite(os.path.join(clean_img_path, file_name), cropped_img)
 
     if PLOT:
-        path = "../datasets/CLaMM_Training_Clean/IRHT_P_007689.tif"
-        #for path in img_ls:
-        run(path, plot=True)
+        for path in img_ls:
+            run(path, plot=True)
     else:
         with Pool() as pool:
             pool.map(run, img_ls)       
