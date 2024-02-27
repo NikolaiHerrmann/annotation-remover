@@ -1,6 +1,6 @@
-# Annotation Remover for ICDAR 2017 ClaMM Dataset
+# Comment Remover for ICDAR 2017 ClaMM Dataset
 
-- A classifier was trained to crop out handwritten annotations in the ClaMM 2016 [1] and 2017 [2] datasets. 
+- A classifier was trained to crop out handwritten/printed comments in the ClaMM 2016 [1] and 2017 [2] datasets. 
 
 - CNN Model is adapted from [3].
 
