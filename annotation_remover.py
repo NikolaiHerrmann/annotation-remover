@@ -175,21 +175,26 @@ if __name__ == "__main__":
     import shutil
     from multiprocessing import Pool
 
-    PLOT = False
+    PLOT = True
 
-    path = "../datasets/ICDAR2017_CLaMM_task1_task3"
-    img_ls = glob.glob(os.path.join(path, "*.tif"))
+    path = "../datasets/ICDAR2017_CLaMM_task2_task4"
+    clean_img_path = "../datasets/CLaMM_task2_task4_Clean"
+    img_exts = ["tif", "jpg", "JPG"]
+
+    img_ls = []
+    for ext in img_exts:
+        img_ls += glob.glob(os.path.join(path, "*." + ext))
+
     csv_ls = glob.glob(os.path.join(path, "*.csv"))
     
     if PLOT:
         random.shuffle(img_ls)
     else:
-        clean_img_path = "../datasets/CLaMM_task1_task3_Clean"
         os.makedirs(clean_img_path, exist_ok=False)
         
         assert len(csv_ls) == 1
-        csv_name = os.path.basename(csv_ls[0])
-        shutil.copy(csv_ls[0], os.path.join(clean_img_path, csv_name))
+        dir_name = os.path.basename(clean_img_path)
+        shutil.copy(csv_ls[0], os.path.join(clean_img_path, "@" + dir_name + ".csv"))
 
     def run(img_path, plot=False):
         model = AnnotationClassifier("remover_model_v1_pad.keras", DIM, True)
