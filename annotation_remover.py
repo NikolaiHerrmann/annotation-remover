@@ -1,5 +1,5 @@
 
-from util import plt_save
+from util import save_figure
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,26 +10,42 @@ from train import resize_img, DIM
 
 class AnnotationClassifier:
 
-    def __init__(self, model_path, dim, pad):
+    def __init__(self, model_path, dim, pad, plot):
         self.model = tf.keras.models.load_model(model_path)
         self.dim = dim
         self.pad = pad
+        self.plot = plot
+        
+        if self.plot:
+            self.comp_path = "comps"
+            self.plot_count = 0
+            os.makedirs(self.comp_path, exist_ok=True)
 
     def predict(self, img):
         img = resize_img(img, size=self.dim, pad=self.pad)
         prediction = self.model(img.reshape(1, self.dim, self.dim, 1), training=False)[0]
-        return (prediction.numpy() > 0.5)[0]
+        prediction = (prediction.numpy() > 0.5)[0]
+
+        if prediction and self.plot:
+            path = os.path.join(self.comp_path, f"c_{self.plot_count}.png")
+            img = cv2.flip(img, 1) * 255
+            cv2.imwrite(path, img, [cv2.IMWRITE_PNG_COMPRESSION, 0])
+            self.plot_count += 1
+
+        return prediction
 
 
 class ComponentExtractor:
 
-    def __init__(self, img_path, min_area=100, max_area=5000, min_dim=10, max_dim=100, remove_ratio=0.15):
+    def __init__(self, img_path, min_area=100, max_area=5000, min_dim=10, 
+                 max_dim=100, remove_ratio=0.15, plot=False):
         self.img_path = img_path
         self.min_area = min_area
         self.max_area = max_area
         self.min_dim = min_dim
         self.max_dim = max_dim
         self.remove_ratio = remove_ratio
+        self.plot = plot
 
         self._extract()
         
@@ -41,10 +57,16 @@ class ComponentExtractor:
         
         self.img_bin = 255 - (255 * (self.img_gray >= threshold_sauvola(self.img_gray)).astype(np.uint8))
 
+        if self.plot:
+            self.img_draw = cv2.cvtColor(self.img_bin.copy(), cv2.COLOR_GRAY2RGB)
+
         if self.remove_ratio > 0:
             height_cutoff = int(self.height * self.remove_ratio)
             width_cutoff = int(self.width * self.remove_ratio)
             self.img_bin[height_cutoff:self.height-height_cutoff, width_cutoff:self.width-width_cutoff] = 0
+
+            if self.plot:
+                self.img_draw[height_cutoff:self.height-height_cutoff, width_cutoff:self.width-width_cutoff] = (0, 0, 0)
 
         self.total_comp, self.pixel_labels, self.comp_info, _ = cv2.connectedComponentsWithStatsWithAlgorithm(self.img_bin, 4, cv2.CV_32S, cv2.CCL_GRANA)
 
@@ -81,26 +103,38 @@ class AnnotationRemover:
             print("No plot available!")
             return
         
-        fig, ax = plt.subplots(2, 3)
-        ax[0, 0].imshow(self.component_extractor.img_org)
-        ax[0, 1].imshow(self.img_draw)
-        ax[0, 2].imshow(self.img_crop)
-        ax[1, 0].imshow(self.img_comps, cmap="gray")
-        ax[1, 1].imshow(self.rows, cmap="gray")
-        ax[1, 2].imshow(self.cols, cmap="gray")
+        # plot for component extractor
+        fig, ax = plt.subplots(1, 3, sharey=True, sharex=True)
 
-        if show:
-            plt.show()
+        ax[0].imshow(self.component_extractor.img_org)
+        ax[0].set_title("a) Raw Input Image")
+        ax[1].imshow(self.component_extractor.img_draw)
+        ax[1].set_title("b) Binarized Image\nwith Filtered Components\nand Discarded Area")
+        ax[2].imshow(self.img_comps, cmap="gray")
+        ax[2].set_title("c) Components\nPredicted as\nComments by CNN")
 
-        if extra_show:
-            fig, ax = plt.subplots(1, 3, figsize=(15, 8))
-            ax[0].imshow(self.img_comps, cmap="gray")
-            ax[0].set_title("Detected Annotations")
-            ax[1].imshow(self.rows, cmap="gray")
-            ax[1].set_title("Max horizontal pass through")
-            ax[2].imshow(self.cols, cmap="gray")
-            ax[2].set_title("Max vertical pass through")
-            plt_save("debug")
+        fig.tight_layout()
+        save_figure("rm_components", show=False)
+        
+        fig, ax = plt.subplots(1, 3, sharey=True)
+        ax[0].imshow(self.boxes)
+        ax[0].set_title("a) Bounding boxes\nof Components")
+        ax[1].imshow(self.rows_draw)
+        ax[1].set_title(f"b) Max Horizontal\nPass Through")
+        ax[2].imshow(self.cols_draw)
+        ax[2].set_title(f"c) Max Vertical\nPass Through")
+
+        fig.tight_layout()
+        save_figure("rm_lines", show=False)
+
+        fig, ax = plt.subplots(1, 2, sharey=True)
+        ax[0].imshow(self.img_draw)
+        ax[0].set_title("a) Crop Lines")
+        ax[1].imshow(self.img_crop)
+        ax[1].set_title("b) Final Cropped Output Image")
+
+        fig.tight_layout()
+        save_figure("rm_crop_lines", show=show)
     
     def _find_crop_line(self):
         height, width = self.cols.shape
@@ -109,21 +143,28 @@ class AnnotationRemover:
         rows_sums = self.rows.sum(axis=1)
 
         cols_best_line = np.argmax(cols_sums)
-        cols_best_count = cols_sums[cols_best_line] / 255
+        self.cols_best_count = cols_sums[cols_best_line] / 255
         rows_best_line = np.argmax(rows_sums)
-        rows_best_count = rows_sums[rows_best_line] / 255
+        self.rows_best_count = rows_sums[rows_best_line] / 255
 
         # times 2 since we have two sets of parallel lines for a rect bounding box
-        if max(rows_best_count, cols_best_count) < (self.num_chars * 2):
+        if max(self.rows_best_count, self.cols_best_count) < (self.num_chars * 2):
             if self.verbose:
                 print("No annotation found")
             return
 
-        axis, is_row, dim = (self.rows, True, height) if rows_best_count > cols_best_count else (self.cols, False, width)
+        axis, is_row, dim = (self.rows, True, height) if self.rows_best_count > self.cols_best_count else (self.cols, False, width)
 
         # draw lines to find contour (not for debug)
         cv2.line(self.cols, (cols_best_line, 0), (cols_best_line, height - 1), (255, 255, 255), 1)
         cv2.line(self.rows, (0, rows_best_line), (width - 1, rows_best_line), (255, 255, 255), 1)
+
+        if self.plot:
+            color = (255, 0, 0)
+            self.cols_draw = cv2.cvtColor(self.cols, cv2.COLOR_GRAY2BGR)
+            self.rows_draw = cv2.cvtColor(self.rows, cv2.COLOR_GRAY2BGR)
+            cv2.line(self.cols_draw, (cols_best_line, 0), (cols_best_line, height - 1), color, self.thickness)
+            cv2.line(self.rows_draw, (0, rows_best_line), (width - 1, rows_best_line), color, self.thickness)
 
         # find largest contour
         contours, _ = cv2.findContours(axis, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -147,6 +188,7 @@ class AnnotationRemover:
   
         self.cols = np.zeros(self.component_extractor.shape, dtype=np.uint8)
         self.rows = np.zeros(self.component_extractor.shape, dtype=np.uint8)
+        self.boxes = self.component_extractor.img_org.copy()
 
         if self.plot:
             self.img_comps = np.zeros(self.component_extractor.shape, dtype=np.uint8)
@@ -154,13 +196,17 @@ class AnnotationRemover:
         for x, y, width, height, comp_mask, comp_cropped in self.component_extractor.components():
             is_annotation = self.model.predict(comp_cropped) 
             if is_annotation:
-                cv2.line(self.cols, (x, y), (x + width, y), (255, 255, 255), 1)
-                cv2.line(self.cols, (x, y + height), (x + width, y + height), (255, 255, 255), 1)
+                self.thickness = 5 if self.plot else 1
+                color = (255, 255, 255)
 
-                cv2.line(self.rows, (x, y), (x, y + height), (255, 255, 255), 1)
-                cv2.line(self.rows, (x + width, y), (x + width, y + height), (255, 255, 255), 1)
+                cv2.line(self.cols, (x, y), (x + width, y), color, self.thickness)
+                cv2.line(self.cols, (x, y + height), (x + width, y + height), color, self.thickness)
+
+                cv2.line(self.rows, (x, y), (x, y + height), color, self.thickness)
+                cv2.line(self.rows, (x + width, y), (x + width, y + height), color, self.thickness)
 
                 if self.plot:
+                    cv2.rectangle(self.boxes, (x, y), (x + width, y + height), (0, 255, 0), self.thickness) 
                     self.img_comps = cv2.bitwise_or(self.img_comps, comp_mask)
 
         self._find_crop_line()
@@ -177,8 +223,8 @@ if __name__ == "__main__":
 
     PLOT = True
 
-    path = "../datasets/ICDAR2017_CLaMM_task2_task4"
-    clean_img_path = "../datasets/CLaMM_task2_task4_Clean"
+    path = "../datasets/ICDAR2017_CLaMM_Training"
+    clean_img_path = ""
     img_exts = ["tif", "jpg", "JPG"]
 
     img_ls = []
@@ -189,6 +235,7 @@ if __name__ == "__main__":
     
     if PLOT:
         random.shuffle(img_ls)
+        random.shuffle(img_ls)
     else:
         os.makedirs(clean_img_path, exist_ok=False)
         
@@ -197,8 +244,8 @@ if __name__ == "__main__":
         shutil.copy(csv_ls[0], os.path.join(clean_img_path, "@" + dir_name + ".csv"))
 
     def run(img_path, plot=False):
-        model = AnnotationClassifier("remover_model_v1_pad.keras", DIM, True)
-        component_extractor = ComponentExtractor(img_path)
+        model = AnnotationClassifier("remover_model_v1_pad.keras", DIM, pad=True, plot=True)
+        component_extractor = ComponentExtractor(img_path, plot=plot)
         annotation_remover = AnnotationRemover(component_extractor, model, plot=plot, verbose=True)
         cropped_img = annotation_remover.remove()
 
@@ -210,7 +257,9 @@ if __name__ == "__main__":
 
     if PLOT:
         for path in img_ls:
+            print("Running pipe on:", path)
             run(path, plot=True)
+            exit()
     else:
         with Pool() as pool:
             pool.map(run, img_ls)       

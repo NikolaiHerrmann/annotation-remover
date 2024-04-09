@@ -1,5 +1,5 @@
 
-from util import SEED
+from util import SEED, save_figure, set_seed
 import tensorflow as tf
 import keras
 from keras import layers
@@ -16,6 +16,9 @@ import os
 
 DIM = 31
 PAD = True
+VERBOSE = True
+METRICS = [accuracy_score, f1_score, recall_score, precision_score]
+SCORES_FILE = "scores.npy"
 
 
 def resize_img(img, size=DIM, pad=PAD):
@@ -65,8 +68,10 @@ def get_model():
     return model
 
 
-def get_summary(model):
-    with open("model_summary.txt", "w") as f:
+def get_summary(model=None, file="model_summary.txt"):
+    if model is None:
+        model = get_model()
+    with open(file, "w") as f:
         model.summary(print_fn=lambda x: f.write(x + "\n"))
 
 
@@ -87,6 +92,18 @@ def load_data(path, is_train):
     return X, y
 
 
+def get_test_metrics(model, X, y, verbose=VERBOSE):
+    y_pred = model.predict(X)
+    y_pred = (y_pred > 0.5).astype(np.int64)
+
+    scores = [m(y, y_pred) for m in METRICS]
+    
+    if verbose:
+        print(scores)
+
+    return scores
+
+
 def run_model(X_train, X_val, y_train, y_val, plot_loss=False):
     model = get_model()
     model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.001), loss='binary_crossentropy', metrics=["accuracy"])
@@ -94,41 +111,34 @@ def run_model(X_train, X_val, y_train, y_val, plot_loss=False):
     callback = keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
     history = model.fit(X_train, y_train, epochs=20, shuffle=True, validation_data=(X_val, y_val), batch_size=64, callbacks=[callback])
     
-    y_val_pred = model.predict(X_val)
-    y_val_pred = (y_val_pred > 0.5).astype(np.int64)
-
-    metrics = [accuracy_score, f1_score, recall_score, precision_score]
-    scores = []
-
-    for m in metrics:
-        scores.append(m(y_val, y_val_pred))
-    print(scores)
+    scores = get_test_metrics(model, X_val, y_val)
     
     if plot_loss:
-        model.save("remover_model_v1_pad.keras")
+        model.save("remover_model_v1_pad_new.keras")
+
         loss = history.history['loss']
         val_loss = history.history['val_loss']
+        
         json.dump(history.history, open("history.json", "w"), indent=4)
 
-        plt.plot(loss, label="Training")
-        plt.plot(val_loss, label="Validation")
+        plt.plot(loss, label="Training (90% Train Set)")
+        plt.plot(val_loss, label="Validation (10% Train Set)")
         plt.xlabel("Epoch")
-        plt.ylabel("Binary Cross Entropy")
-        plt.title("Annotation Remover Loss Curve")
+        plt.ylabel("Binary Cross Entropy Loss")
+        plt.title("CNN Loss Curve")
         plt.legend()
 
-        name = "loss_curve_2"
-        plt.savefig(name + ".png", dpi=300, bbox_inches="tight")
-        plt.savefig(name + ".pdf", bbox_inches="tight")
+        save_figure("cnn_loss_curve")
 
     return scores
 
 
-def run_kfold(X, y):
-    skf = StratifiedKFold(n_splits=10, random_state=SEED, shuffle=True)
+def run_kfold(X, y, splits=10):
+    skf = StratifiedKFold(n_splits=splits, random_state=SEED, shuffle=True)
     scores = []
 
     for i, (train_index, test_index) in enumerate(skf.split(X, y)):
+        print(f"Running split: {i+1}/{splits}")
         X_train, X_val = X[train_index, :], X[test_index, :]
         y_train, y_val = y[train_index, :], y[test_index, :]
 
@@ -136,16 +146,37 @@ def run_kfold(X, y):
         scores.append(score)
 
     print(scores)
+    scores = np.array(scores)
+    np.save(SCORES_FILE, scores)
+    print_scores()
+
+
+def print_scores():
+    scores = np.load(SCORES_FILE)
     print("---")
     print("accuracy, f1, recall, precision")
-    print("Means", np.mean(np.array(scores), axis=0))
-    print("Std", np.std(np.array(scores), axis=0))
+    print("Means", np.round(np.mean(scores, axis=0), 3))
+    print("Std", np.round(np.std(scores, axis=0), 3))
 
 
-if __name__ == "__main__":
+def run_train():
     X, y = load_data("imgs", is_train=True)
 
     run_kfold(X, y)
+    set_seed()
 
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.1, random_state=SEED, stratify=y)
     run_model(X_train, X_val, y_train, y_val, plot_loss=True)
+
+
+def run_test(model_path):
+    X_test, y_test = load_data("imgs", is_train=False)
+    model = tf.keras.models.load_model(model_path)
+    scores = get_test_metrics(model, X_test, y_test)
+    print(np.round(scores, 3))
+
+
+if __name__ == "__main__":
+    get_summary()
+    run_train()
+    # run_test("remover_model_v1_pad.keras")

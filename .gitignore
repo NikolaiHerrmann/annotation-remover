@@ -1,8 +1,10 @@
 __pycache__/
-imgs/
-*.txt
+imgs*/
 extra/
 *.pdf
-*.json
 annotations/
 loss*
+debug*
+figs/
+comps/
+*new*
