@@ -127,11 +127,14 @@ class AnnotationRemover:
         fig.tight_layout()
         save_figure("rm_lines", show=False)
 
-        fig, ax = plt.subplots(1, 2, sharey=True)
-        ax[0].imshow(self.img_draw)
+        fig, ax = plt.subplots(1, 3, sharey=True, subplot_kw=dict(aspect="equal"),
+                               gridspec_kw=dict(width_ratios=[2, 2, 1.9]))
+        ax[0].imshow(self.contour_draw)
         ax[0].set_title("a) Crop Lines")
-        ax[1].imshow(self.img_crop)
-        ax[1].set_title("b) Final Cropped Output Image")
+        ax[1].imshow(self.img_draw)
+        ax[1].set_title("b) Crop Lines Overlaid")
+        ax[2].imshow(self.img_crop)
+        ax[2].set_title("c) Final Cropped\nOutput Image")
 
         fig.tight_layout()
         save_figure("rm_crop_lines", show=show)
@@ -154,6 +157,9 @@ class AnnotationRemover:
             return
 
         axis, is_row, dim = (self.rows, True, height) if self.rows_best_count > self.cols_best_count else (self.cols, False, width)
+
+        if self.plot:
+            axis_draw = axis.copy()
 
         # draw lines to find contour (not for debug)
         cv2.line(self.cols, (cols_best_line, 0), (cols_best_line, height - 1), (255, 255, 255), 1)
@@ -181,8 +187,19 @@ class AnnotationRemover:
         self.img_crop = self.img_crop[min_idx:max_idx, :] if is_row else self.img_crop[:, min_idx:max_idx]
 
         if self.plot:
-            cv2.rectangle(self.img_draw, (contour_x, contour_y),
-                          (contour_x + contour_width, contour_y + contour_height), (0, 255, 0), 3)
+            def draw_rect(x):
+                cv2.rectangle(x, (contour_x, contour_y),
+                              (contour_x + contour_width, contour_y + contour_height), (0, 255, 0), 3)
+                return x
+            
+            draw_rect(self.img_draw)
+
+            self.contour_draw = np.zeros(axis.shape, dtype=np.uint8)
+            y_s, y_e = contour_y, contour_y + contour_height
+            x_s, x_e = contour_x, contour_x + contour_width
+            self.contour_draw[y_s:y_e, x_s:x_e] = axis_draw[y_s:y_e, x_s:x_e]
+
+            self.contour_draw = draw_rect(cv2.cvtColor(self.contour_draw, cv2.COLOR_GRAY2RGB))
 
     def remove(self):
   
