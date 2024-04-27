@@ -3,6 +3,7 @@ from util import save_figure
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 from skimage.filters import threshold_sauvola
 import tensorflow as tf
 from train import resize_img, DIM
@@ -98,7 +99,30 @@ class AnnotationRemover:
         if self.plot:
             self.img_draw = self.img_crop.copy()
 
-    def get_debug_drawing(self, show=True, extra_show=True):
+    def draw_zoom_in(self, ax, img, x1, y1, width, height, x_new, y_new,
+                     zoom_factor=2.1, color="red", line_width=2):
+        
+        extract = img[y1:y1+height, x1:x1+width].copy()
+        height_small, width_small, _ = extract.shape
+
+        extract = cv2.resize(extract, (0, 0), fx=zoom_factor, fy=zoom_factor, interpolation=cv2.INTER_CUBIC)
+        height_large, width_large, _ = extract.shape
+
+        x_small, y_small = x1, y1        
+
+        x_large, y_large = x_new, y_new
+        img[y_large:y_large+height_large, x_large:x_large+width_large, :] = extract
+        
+        rect_large = Rectangle((x_large, y_large), width_large, height_large, linewidth=line_width, edgecolor=color, facecolor="none")
+        rect_small = Rectangle((x_small, y_small), width_small, height_small, linewidth=line_width, edgecolor=color, facecolor="none")
+
+        ax.plot((x_small, x_large), (y_small, y_large), color=color, linewidth=line_width)
+        ax.plot((x_small + width_small, x_large + width_large), (y_small + height_small, y_large + height_large), color=color, linewidth=line_width) 
+        ax.imshow(img)
+        ax.add_patch(rect_large)
+        ax.add_patch(rect_small)
+
+    def get_debug_drawing(self, show=True):
         if not self.plot or self.rows is None:
             print("No plot available!")
             return
@@ -106,8 +130,9 @@ class AnnotationRemover:
         # plot for component extractor
         fig, ax = plt.subplots(1, 3, sharey=True, sharex=True)
 
-        ax[0].imshow(self.component_extractor.img_org)
         ax[0].set_title("a) Raw Input Image")
+        self.draw_zoom_in(ax[0], self.component_extractor.img_org, 0, 1000, 75, 780, 200, 50)
+        
         ax[1].imshow(self.component_extractor.img_draw)
         ax[1].set_title("b) Binarized Image\nwith Filtered Components\nand Discarded Area")
         ax[2].imshow(self.img_comps, cmap="gray")
@@ -137,7 +162,24 @@ class AnnotationRemover:
         ax[2].set_title("c) Final Cropped\nOutput Image")
 
         fig.tight_layout()
-        save_figure("rm_crop_lines", show=show)
+        save_figure("rm_crop_lines", show=False)
+
+        # For slides
+        fig, ax = plt.subplots(1, 5, sharey=True, figsize=(10, 5))
+
+        ax[0].set_title("a) Raw Input Image")
+        self.draw_zoom_in(ax[0], self.component_extractor.img_org, 0, 1000, 75, 780, 200, 50)
+        ax[1].imshow(self.boxes)
+        ax[1].set_title("a) Components\nDetected as\nComments by CNN")
+        ax[2].imshow(self.rows_draw)
+        ax[2].set_title(f"b) Max Horizontal\nPass Through")
+        ax[3].imshow(self.cols_draw)
+        ax[3].set_title(f"c) Max Vertical\nPass Through")
+        ax[4].imshow(self.img_draw)
+        ax[4].set_title("d) Crop Lines")
+
+        fig.tight_layout()
+        save_figure("slides_comp", show=show)
     
     def _find_crop_line(self):
         height, width = self.cols.shape

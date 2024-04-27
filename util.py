@@ -17,12 +17,13 @@ def set_seed():
 set_seed()
 
 
-def save_figure(title, fig=None, fig_dir=FIGURE_PATH, show=False, pdf=True, png=True, dpi=400):
+def save_figure(title, fig=None, fig_dir=FIGURE_PATH, show=False, pdf=True, 
+                png=True, dpi=400, transparent=True):
     if not fig:
         fig = plt.gcf()
     if png:
-        fig.savefig(os.path.join(fig_dir, title + ".png"), dpi=dpi, bbox_inches="tight")
+        fig.savefig(os.path.join(fig_dir, title + ".png"), dpi=dpi, bbox_inches="tight", transparent=transparent)
     if pdf:
-        fig.savefig(os.path.join(fig_dir, title + ".pdf"), dpi=dpi, bbox_inches="tight")
+        fig.savefig(os.path.join(fig_dir, title + ".pdf"), dpi=dpi, bbox_inches="tight", transparent=transparent)
     if show:
         plt.show()
