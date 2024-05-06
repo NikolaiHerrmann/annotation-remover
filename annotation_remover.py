@@ -1,4 +1,5 @@
 
+import os
 from util import save_figure
 import cv2
 import numpy as np
@@ -122,7 +123,7 @@ class AnnotationRemover:
         ax.add_patch(rect_large)
         ax.add_patch(rect_small)
 
-    def get_debug_drawing(self, show=True):
+    def get_debug_drawing(self, show=True, debug=False, debug_save_name=""):
         if not self.plot or self.rows is None:
             print("No plot available!")
             return
@@ -165,21 +166,28 @@ class AnnotationRemover:
         save_figure("rm_crop_lines", show=False)
 
         # For slides
-        fig, ax = plt.subplots(1, 5, sharey=True, figsize=(10, 5))
+        num_cols = 5 if not debug else 4
+        fig, ax = plt.subplots(1, num_cols, sharey=True, figsize=(10, 5))
 
-        ax[0].set_title("a) Raw Input Image")
-        self.draw_zoom_in(ax[0], self.component_extractor.img_org, 0, 1000, 75, 780, 200, 50)
-        ax[1].imshow(self.boxes)
-        ax[1].set_title("a) Components\nDetected as\nComments by CNN")
-        ax[2].imshow(self.rows_draw)
-        ax[2].set_title(f"b) Max Horizontal\nPass Through")
-        ax[3].imshow(self.cols_draw)
-        ax[3].set_title(f"c) Max Vertical\nPass Through")
-        ax[4].imshow(self.img_draw)
-        ax[4].set_title("d) Crop Lines")
+        if not debug:
+            ax[0].set_title("a) Raw Input Image")
+            self.draw_zoom_in(ax[0], self.component_extractor.img_org, 0, 1000, 75, 780, 200, 50)
+            n = 0
+        else:
+            n = -1
+
+        ax[n+1].imshow(self.boxes)
+        ax[n+1].set_title("a) Components\nDetected as\nComments by CNN")
+        ax[n+2].imshow(self.rows_draw)
+        ax[n+2].set_title(f"b) Max Horizontal\nPass Through")
+        ax[n+3].imshow(self.cols_draw)
+        ax[n+3].set_title(f"c) Max Vertical\nPass Through")
+        ax[n+4].imshow(self.img_draw)
+        ax[n+4].set_title("d) Crop Lines")
 
         fig.tight_layout()
-        save_figure("slides_comp", show=show)
+        save_name = "slides_comp" if not debug else debug_save_name
+        save_figure(save_name, show=show)
     
     def _find_crop_line(self):
         height, width = self.cols.shape
