@@ -3,11 +3,14 @@ import os
 from util import save_figure
 import cv2
 import numpy as np
+import copy
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from skimage.filters import threshold_sauvola
 import tensorflow as tf
+import random
 from train import resize_img, DIM
+from ocr import OCR
 
 
 class AnnotationClassifier:
@@ -67,12 +70,12 @@ class ComponentExtractor:
             width_cutoff = int(self.width * self.remove_ratio)
             self.img_bin[height_cutoff:self.height-height_cutoff, width_cutoff:self.width-width_cutoff] = 0
 
-            if self.plot:
-                self.img_draw[height_cutoff:self.height-height_cutoff, width_cutoff:self.width-width_cutoff] = (0, 0, 0)
-
         self.total_comp, self.pixel_labels, self.comp_info, _ = cv2.connectedComponentsWithStatsWithAlgorithm(self.img_bin, 4, cv2.CV_32S, cv2.CCL_GRANA)
 
     def components(self):
+        if self.plot:
+            self.img_draw_color = np.zeros(shape=self.img_draw.shape, dtype=np.uint8)
+
         for i in range(1, self.total_comp): 
             
             area = self.comp_info[i, cv2.CC_STAT_AREA]
@@ -84,12 +87,17 @@ class ComponentExtractor:
                 comp_mask = (self.pixel_labels == i).astype(np.uint8) * 255
                 comp_cropped = comp_mask[y:y+height, x:x+width]
 
+                if self.plot:
+                    color = np.random.choice(range(256), size=3).astype(np.uint8)
+                    self.img_draw_color[comp_mask == 255] = color
+
                 yield x, y, width, height, comp_mask, comp_cropped
 
 
 class AnnotationRemover:
 
-    def __init__(self, component_extractor, model, num_chars=8, verbose=False, plot=True):
+    def __init__(self, component_extractor, model, num_chars=8, verbose=False, 
+                 plot=True, use_ocr=False, ocr_thresh=0.9):
         self.component_extractor = component_extractor
         self.img_crop = self.component_extractor.img_org.copy()
         self.model = model
@@ -97,8 +105,13 @@ class AnnotationRemover:
         self.verbose = verbose
         self.plot = plot
         self.rows = None
+        self.use_ocr = use_ocr
+        
+        if self.use_ocr:
+            self.ocr = OCR(ocr_thresh)
+
         if self.plot:
-            self.img_draw = self.img_crop.copy()
+            self.img_draw = copy.deepcopy(self.img_crop)
 
     def draw_zoom_in(self, ax, img, x1, y1, width, height, x_new, y_new,
                      zoom_factor=2.1, color="red", line_width=2):
@@ -129,15 +142,17 @@ class AnnotationRemover:
             return
         
         # plot for component extractor
-        fig, ax = plt.subplots(1, 3, sharey=True, sharex=True)
+        fig, ax = plt.subplots(1, 4, sharey=True, sharex=True, figsize=(8, 5))
 
         ax[0].set_title("a) Raw Input Image")
         self.draw_zoom_in(ax[0], self.component_extractor.img_org, 0, 1000, 75, 780, 200, 50)
         
         ax[1].imshow(self.component_extractor.img_draw)
-        ax[1].set_title("b) Binarized Image\nwith Filtered Components\nand Discarded Area")
-        ax[2].imshow(self.img_comps, cmap="gray")
-        ax[2].set_title("c) Components\nPredicted as\nComments by CNN")
+        ax[1].set_title("b) Binarized\nImage")
+        ax[2].imshow(self.component_extractor.img_draw_color)
+        ax[2].set_title("c) Extracted Components\nand Discarded Area")
+        ax[3].imshow(self.img_comps, cmap="gray")
+        ax[3].set_title("d) Components\nPredicted as\nComments by CNN")
 
         fig.tight_layout()
         save_figure("rm_components", show=False)
@@ -234,6 +249,18 @@ class AnnotationRemover:
 
         min_idx, max_idx = (cut_line, dim) if (dim / 2) > cut_line else (0, cut_line)
 
+        if self.use_ocr:
+            self.comment = self.img_crop[contour_y:contour_y+contour_height,
+                                         contour_x:contour_x+contour_width]
+            height_c, width_c, _ = self.comment.shape
+            if height_c > width_c:
+                self.comment = cv2.rotate(self.comment, cv2.ROTATE_90_CLOCKWISE)
+            text, prob = self.ocr.run(self.comment)
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.imshow(self.comment)
+            ax.set_title(f"Detected text: {text}\nScore: {np.round(prob, 3)}")
+            save_figure("ocr_example", fig=fig, show=False)
+
         self.img_crop = self.img_crop[min_idx:max_idx, :] if is_row else self.img_crop[:, min_idx:max_idx]
 
         if self.plot:
@@ -313,7 +340,7 @@ if __name__ == "__main__":
     def run(img_path, plot=False):
         model = AnnotationClassifier("remover_model_v1_pad.keras", DIM, pad=True, plot=True)
         component_extractor = ComponentExtractor(img_path, plot=plot)
-        annotation_remover = AnnotationRemover(component_extractor, model, plot=plot, verbose=True)
+        annotation_remover = AnnotationRemover(component_extractor, model, plot=plot, verbose=True, use_ocr=False)
         cropped_img = annotation_remover.remove()
 
         if plot:

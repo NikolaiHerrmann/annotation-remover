@@ -57,10 +57,10 @@ def run_test():
         cv2.imwrite(new_name, cropped_img)
 
 
-def run_pipeline(x, plot=False, debug_save_name=None):
+def run_pipeline(x, plot=False, debug_save_name=None, use_ocr=False):
     model = AnnotationClassifier("remover_model_v1_pad.keras", DIM, pad=True, plot=False)
     component_extractor = ComponentExtractor(x, plot=plot)
-    annotation_remover = AnnotationRemover(component_extractor, model, plot=plot, verbose=True)
+    annotation_remover = AnnotationRemover(component_extractor, model, plot=plot, verbose=True, use_ocr=use_ocr)
     cropped_img = annotation_remover.remove()
 
     if plot:
@@ -82,12 +82,14 @@ def get_results():
     comment_mistakes = comment_imgs[comment_imgs["correct"] == "no"]
 
     for i, x in enumerate(comment_mistakes["img"]):
+        print("Test example for", x)
         run_pipeline(os.path.join(CLAMM_PATH, x), plot=True, debug_save_name=f"fail_com{i}")
         break
 
     non_comment_mistakes = non_comment_imgs[non_comment_imgs["correct"] == "no"]
 
     for i, x in enumerate(non_comment_mistakes["img"]):
+        print("Test example for", x)
         run_pipeline(os.path.join(CLAMM_PATH, x), plot=True, debug_save_name=f"fail_no-com{i}")
         if i == 2:
             break
