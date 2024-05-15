@@ -17,6 +17,7 @@ class OCR:
         self.model.config.vocab_size = self.model.config.decoder.vocab_size
 
         # Beam search parameters
+        # Adapted from https://github.com/NielsRogge/Transformers-Tutorials/blob/master/TrOCR/Fine_tune_TrOCR_on_IAM_Handwriting_Database_using_Seq2SeqTrainer.ipynb
         self.model.config.eos_token_id = self.processor.tokenizer.sep_token_id
         self.model.config.max_length = 10
         self.model.config.early_stopping = True

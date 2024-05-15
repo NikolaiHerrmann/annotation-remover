@@ -258,7 +258,8 @@ class AnnotationRemover:
             text, prob = self.ocr.run(self.comment)
             fig, ax = plt.subplots(figsize=(8, 5))
             ax.imshow(self.comment)
-            ax.set_title(f"Detected text: {text}\nScore: {np.round(prob, 3)}")
+            quote = '"'
+            ax.set_title(f"Detected text: {quote}{text}{quote}\nScore: {np.round(prob, 3)}")
             save_figure("ocr_example", fig=fig, show=False)
 
         self.img_crop = self.img_crop[min_idx:max_idx, :] if is_row else self.img_crop[:, min_idx:max_idx]
@@ -340,7 +341,7 @@ if __name__ == "__main__":
     def run(img_path, plot=False):
         model = AnnotationClassifier("remover_model_v1_pad.keras", DIM, pad=True, plot=True)
         component_extractor = ComponentExtractor(img_path, plot=plot)
-        annotation_remover = AnnotationRemover(component_extractor, model, plot=plot, verbose=True, use_ocr=False)
+        annotation_remover = AnnotationRemover(component_extractor, model, plot=plot, verbose=True, use_ocr=plot)
         cropped_img = annotation_remover.remove()
 
         if plot:
