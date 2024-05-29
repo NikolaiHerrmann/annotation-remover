@@ -179,4 +179,4 @@ def run_test(model_path):
 if __name__ == "__main__":
     get_summary()
     run_train()
-    # run_test("remover_model_v1_pad.keras")
+    run_test("remover_model_v1_pad.keras")

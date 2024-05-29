@@ -8,6 +8,20 @@
 
 ![](example.png)
 
+# Run
+
+Install all Python requirements:
+```
+pip install -r requirements.txt
+```
+
+To run comment remover run:
+```
+python annotation_remover.py --img_dir [clamm_img_dir] --plot [yes/no]
+```
+`--img_dir` specifies were the clamm images are and `--plot` if we should run an example on the first image found while making various debug plots.
+
+To train the model see the `train.py` file and its main function for examples. Model weights `remover_model_v1_pad.keras` was trained with padding while `remover_model_v1.keras` was not.
 
 ## References
 

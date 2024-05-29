@@ -261,6 +261,11 @@ class AnnotationRemover:
             quote = '"'
             ax.set_title(f"Detected text: {quote}{text}{quote}\nScore: {np.round(prob, 3)}")
             save_figure("ocr_example", fig=fig, show=False)
+            fig, ax = plt.subplots()
+            ax.imshow(self.comment)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            save_figure("comment_example", fig=fig, show=False)
 
         self.img_crop = self.img_crop[min_idx:max_idx, :] if is_row else self.img_crop[:, min_idx:max_idx]
 
@@ -315,11 +320,17 @@ if __name__ == "__main__":
     import os
     import shutil
     from multiprocessing import Pool
+    import argparse
 
-    PLOT = True
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--img_dir", help="path to directory of images", default="../datasets/ICDAR2017_CLaMM_Training", type=str, required=False)
+    parser.add_argument("--plot", help="plot first image only", type=str, default="yes", required=False)
+    args = parser.parse_args()
 
-    path = "../datasets/ICDAR2017_CLaMM_Training"
-    clean_img_path = ""
+    PLOT = args.plot == "yes"
+
+    path = args.img_dir
+    clean_img_path = "cleaned_imgs"
     img_exts = ["tif", "jpg", "JPG"]
 
     img_ls = []
