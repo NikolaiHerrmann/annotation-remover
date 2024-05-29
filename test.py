@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 
-TEST_PATH = "test_imgs"
+TEST_PATH = "test_imgs_2"
 CLAMM_PATH = "../datasets/ICDAR2017_CLaMM_Training"
 
 
@@ -29,6 +29,8 @@ def pick_n_random(n=6):
     clamm_imgs = glob.glob(clamm_path)
     test_imgs = set()
 
+    prev_run = pd.read_csv("test_imgs_final.csv")["img"].to_list()
+
     os.makedirs(TEST_PATH, exist_ok=True)
 
     csv_img = []
@@ -38,7 +40,7 @@ def pick_n_random(n=6):
         while True:
             img = random.choice(clamm_imgs)
             img_base = os.path.basename(img)
-            if (img_base in test_imgs) or (img_base in train_imgs):
+            if (img_base in test_imgs) or (img_base in train_imgs) or (img_base in prev_run):
                 continue
             test_imgs.add(img_base)
             break
@@ -47,7 +49,7 @@ def pick_n_random(n=6):
         csv_state.append(1)
 
     df = pd.DataFrame({"img": csv_img, "correct": csv_state})
-    df.to_csv("test_imgs.csv", index=False)
+    df.to_csv("test_imgs_final_2.csv", index=False)
 
 
 def run_test():
@@ -68,15 +70,17 @@ def run_pipeline(x, plot=False, debug_save_name=None, use_ocr=False):
 
     return cropped_img
 
-
-def get_results():
-    df = pd.read_csv("test_imgs_final.csv")
+def get_results(path="test_imgs_final.csv", plot=True):
+    df = pd.read_csv(path)
     comment_imgs = df[df["comment"] == "yes"]
     non_comment_imgs = df[df["comment"] == "no"]
 
     print("\nStats:")
     print(np.unique(comment_imgs["correct"], return_counts=True))
     print(np.unique(non_comment_imgs["correct"], return_counts=True))
+    
+    if not plot:
+        return
 
     # plot examples
     comment_mistakes = comment_imgs[comment_imgs["correct"] == "no"]
@@ -97,6 +101,6 @@ def get_results():
 
 if __name__ == "__main__":
     random.seed(42)
-    # pick_n_random(50)
-    # run_test()
-    get_results()
+    #pick_n_random(50)
+    #run_test()
+    get_results(path="test_imgs_final_2.csv", plot=False)
