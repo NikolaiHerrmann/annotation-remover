@@ -35,6 +35,8 @@ To train the model see the `train.py` file and its main function for examples. H
 
 - [test_imgs_final.csv](test_imgs_final.csv) and [test_imgs_final_2.csv](test_imgs_final_2.csv): experiment results from 50 random images
 
+- [history.json](history.json), [scores.npy](scores.npy) and [model_summary.txt](model_summary.txt): epoch results and benchmarking from CNN training
+
 # References
 
 [1] Cloppet, F., Eglin, V., Stutzmann, D., & Vincent, N. (2016, October). ICFHR2016 competition on the classification of medieval handwritings in latin script. In 2016 15th International Conference on Frontiers in Handwriting Recognition (ICFHR) (pp. 590-595). IEEE.
