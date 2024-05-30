@@ -15,7 +15,7 @@ Install all Python requirements:
 pip install -r requirements.txt
 ```
 
-To run comment remover run:
+Run comment remover:
 ```
 python annotation_remover.py --img_dir [clamm_img_dir] --plot [yes/no]
 ```
