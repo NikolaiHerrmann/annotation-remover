@@ -33,6 +33,8 @@ To train the model see the `train.py` file and its main function for examples. H
 
 - [test.py](test.py): tests the pipeline on 50 random CLaMM images
 
+- [ocr.py](ocr.py): uses TrOCR to transcribe a comment
+
 - [test_imgs_final.csv](test_imgs_final.csv) and [test_imgs_final_2.csv](test_imgs_final_2.csv): experiment results from 50 random images
 
 - [history.json](history.json), [scores.npy](scores.npy) and [model_summary.txt](model_summary.txt): epoch results and benchmarking from CNN training
