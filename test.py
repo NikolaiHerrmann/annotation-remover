@@ -9,6 +9,7 @@ import cv2
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from util import SEED
 
 
 TEST_PATH = "test_imgs_2"
@@ -100,7 +101,7 @@ def get_results(path="test_imgs_final.csv", plot=True):
 
 
 if __name__ == "__main__":
-    random.seed(42)
+    random.seed(SEED)
     #pick_n_random(50)
     #run_test()
     get_results(path="test_imgs_final_2.csv", plot=False)

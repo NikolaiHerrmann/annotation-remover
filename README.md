@@ -21,9 +21,21 @@ python annotation_remover.py --img_dir [clamm_img_dir] --plot [yes/no]
 ```
 `--img_dir` specifies were the clamm images are and `--plot` if we should run an example on the first image found while making various debug plots.
 
-To train the model see the `train.py` file and its main function for examples. Model weights `remover_model_v1_pad.keras` was trained with padding while `remover_model_v1.keras` was not.
+To train the model see the `train.py` file and its main function for examples. However, model weights are provided. Model `remover_model_v1_pad.keras` was trained with padding while `remover_model_v1.keras` was not.
 
-## References
+# Overview
+
+- [annotation_remover.py](annotation_remover.py): includes all classes to run the pipeline
+
+- [extract.py](extract.py): extract contours from 28 cropped training images
+
+- [train.py](train.py): train and test the CNN
+
+- [test.py](test.py): tests the pipeline on 50 random CLaMM images
+
+- [test_imgs_final.csv](test_imgs_final.csv) and [test_imgs_final_2.csv](test_imgs_final_2.csv): experiment results from 50 random images
+
+# References
 
 [1] Cloppet, F., Eglin, V., Stutzmann, D., & Vincent, N. (2016, October). ICFHR2016 competition on the classification of medieval handwritings in latin script. In 2016 15th International Conference on Frontiers in Handwriting Recognition (ICFHR) (pp. 590-595). IEEE.
 
