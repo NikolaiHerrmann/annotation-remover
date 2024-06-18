@@ -11,15 +11,35 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 
+# Extract components to then manually label
+
+
 def img_basename(path):
+    """Get image (filename) name
+
+    :param path: path to image
+    :return: name
+    """
     return os.path.basename(path).rsplit(".", 1)[0]
 
 
 def save_img(path, name, arr):
+    """Save image to disk (not sure why I am not using opencv here)
+
+    :param path: path where to save image
+    :param name: name of file
+    :param arr: image as numpy array
+    """
     plt.imsave(os.path.join(path, name), arr, cmap="gray")
 
 
 def extract(save_path, read_path, search_card):
+    """Extract
+
+    :param save_path: where to save components
+    :param read_path: where to read images from
+    :param search_card: wild card to find certain images
+    """
     os.makedirs(save_path, exist_ok=True)
 
     img_paths = glob.glob(os.path.join(read_path, search_card))
@@ -34,6 +54,15 @@ def extract(save_path, read_path, search_card):
 
 
 def save_images(img_paths, save_path, augment, examine_shapes=False):
+    """Apply augmentations to all connected components by rotating them.
+    Also determine mean and median sizes
+
+    :param img_paths: path to connected components
+    :param save_path: path where to save augmentations
+    :param augment: whether to augment
+    :param examine_shapes: whether to determine mean and median, defaults to False
+    :return: how many augmentations were made + original image
+    """
     os.makedirs(save_path, exist_ok=True)
     count = 0
     shapes = []
@@ -60,6 +89,13 @@ def save_images(img_paths, save_path, augment, examine_shapes=False):
 
 
 def make_splits(ant_path, text_path, test_path, train_path):
+    """Split the connected component dataset into test and train
+
+    :param ant_path: path to connected components which are comments
+    :param text_path: path to connected components which are not comments (part of main body text)
+    :param test_path: path where to save test images
+    :param train_path: path where to save train images
+    """
     os.makedirs(test_path, exist_ok=True)
     os.makedirs(train_path, exist_ok=True)
 

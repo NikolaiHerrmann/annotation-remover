@@ -14,8 +14,18 @@ from ocr import OCR
 
 
 class AnnotationClassifier:
+    """
+    Loads neural network to classify components 
+    """
 
     def __init__(self, model_path, dim, pad, plot):
+        """Constructor
+
+        :param model_path: path to trained model
+        :param dim: dimension each component should be resized to
+        :param pad: whether to pad images
+        :param plot: writes detected comment components to disk
+        """
         self.model = tf.keras.models.load_model(model_path)
         self.dim = dim
         self.pad = pad
@@ -27,6 +37,11 @@ class AnnotationClassifier:
             os.makedirs(self.comp_path, exist_ok=True)
 
     def predict(self, img):
+        """Run prediction
+
+        :param img: input image
+        :return: True if component was a comment else False
+        """
         img = resize_img(img, size=self.dim, pad=self.pad)
         prediction = self.model(img.reshape(1, self.dim, self.dim, 1), training=False)[0]
         prediction = (prediction.numpy() > 0.5)[0]
@@ -41,9 +56,22 @@ class AnnotationClassifier:
 
 
 class ComponentExtractor:
+    """
+    Extracts connected components (CC) from image
+    """
 
     def __init__(self, img_path, min_area=100, max_area=5000, min_dim=10, 
                  max_dim=100, remove_ratio=0.15, plot=False):
+        """Constructor (makes extraction call in constructor already)
+
+        :param img_path: path to image
+        :param min_area: minimum pixel area a CC can have, defaults to 100
+        :param max_area: maximum pixel area a CC can have, defaults to 5000
+        :param min_dim: minimum pixel dimension a CC can have, defaults to 10
+        :param max_dim: maximum pixel dimension a CC can have, defaults to 100
+        :param remove_ratio: controls the size of the discard area in center of image, defaults to 0.15
+        :param plot: whether to make plots, defaults to False
+        """
         self.img_path = img_path
         self.min_area = min_area
         self.max_area = max_area
@@ -55,6 +83,8 @@ class ComponentExtractor:
         self._extract()
         
     def _extract(self):
+        """Extract using connectedComponentsWithStatsWithAlgorithm function
+        """
         self.img_org = cv2.imread(self.img_path)
         self.img_gray = cv2.cvtColor(self.img_org, cv2.COLOR_BGR2GRAY)
         self.shape = self.img_gray.shape
@@ -73,6 +103,10 @@ class ComponentExtractor:
         self.total_comp, self.pixel_labels, self.comp_info, _ = cv2.connectedComponentsWithStatsWithAlgorithm(self.img_bin, 4, cv2.CV_32S, cv2.CCL_GRANA)
 
     def components(self):
+        """Creates a generator that provides info about each extracted component
+
+        :yield: x-coordinate of CC, y-coordinate of CC, width of CC, height of CC, binary mask of CC, cropped CC
+        """
         if self.plot:
             self.img_draw_color = np.zeros(shape=self.img_draw.shape, dtype=np.uint8)
 
@@ -95,9 +129,22 @@ class ComponentExtractor:
 
 
 class AnnotationRemover:
+    """
+    Comment removing pipeline (initially called this annotation remover)
+    """
 
     def __init__(self, component_extractor, model, num_chars=8, verbose=False, 
                  plot=True, use_ocr=False, ocr_thresh=0.9):
+        """Constructor
+
+        :param component_extractor: instance of ComponentExtractor
+        :param model: instance of AnnotationClassifier
+        :param num_chars: detection threshold (minimum number of bounding boxes that need pass through a line), defaults to 8
+        :param verbose: print debug, defaults to False
+        :param plot: whether to make debug plots, defaults to True
+        :param use_ocr: whether to use TrOCR to transcribe comment, defaults to False
+        :param ocr_thresh: experimental (tried with TrOCR), defaults to 0.9
+        """
         self.component_extractor = component_extractor
         self.img_crop = self.component_extractor.img_org.copy()
         self.model = model
@@ -115,7 +162,21 @@ class AnnotationRemover:
 
     def draw_zoom_in(self, ax, img, x1, y1, width, height, x_new, y_new,
                      zoom_factor=2.1, color="red", line_width=2):
-        
+        """This is a hard coded function for the test image to highlight the comment in red.
+        You need to manually input the location and size of the comment
+
+        :param ax: matplotlib axis to draw on
+        :param img: raw image
+        :param x1: x-coordinate of comment
+        :param y1: y-coordinate of comment
+        :param width: width of comment
+        :param height: height of comment
+        :param x_new: x-coordinate for larger comment image
+        :param y_new: y-coordinate for larger comment image
+        :param zoom_factor: how much to enlarge the comment, defaults to 2.1
+        :param color: color of bounding box, defaults to "red"
+        :param line_width: stroke width of bounding box, defaults to 2
+        """
         extract = img[y1:y1+height, x1:x1+width].copy()
         height_small, width_small, _ = extract.shape
 
@@ -137,6 +198,12 @@ class AnnotationRemover:
         ax.add_patch(rect_small)
 
     def get_debug_drawing(self, show=True, debug=False, debug_save_name=""):
+        """Makes a debug drawing to see individual decisions of components
+
+        :param show: whether to call plt.show() from matplotlib, defaults to True
+        :param debug: debug print, defaults to False
+        :param debug_save_name: where to save debug drawing, defaults to ""
+        """
         if not self.plot or self.rows is None:
             print("No plot available!")
             return
@@ -205,6 +272,9 @@ class AnnotationRemover:
         save_figure(save_name, show=show)
     
     def _find_crop_line(self):
+        """Given the classifications of the components find the crop lines.
+        Calculates maximum and vertical bounding box pass through.
+        """
         height, width = self.cols.shape
 
         cols_sums = self.cols.sum(axis=0)
@@ -285,6 +355,10 @@ class AnnotationRemover:
             self.contour_draw = draw_rect(cv2.cvtColor(self.contour_draw, cv2.COLOR_GRAY2RGB))
 
     def remove(self):
+        """Run comment removing pipeline
+
+        :return: cropped image
+        """
   
         self.cols = np.zeros(self.component_extractor.shape, dtype=np.uint8)
         self.rows = np.zeros(self.component_extractor.shape, dtype=np.uint8)

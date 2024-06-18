@@ -22,6 +22,13 @@ SCORES_FILE = "scores.npy"
 
 
 def resize_img(img, size=DIM, pad=PAD):
+    """Resize image to specified size
+
+    :param img: image to resize
+    :param size: new size of image, defaults to DIM
+    :param pad: whether to pad image or not (maintains aspect ratio), defaults to PAD
+    :return: resize image
+    """
     if not pad:
         img = cv2.resize(img, (size, size), interpolation=cv2.INTER_NEAREST)
     else:
@@ -44,12 +51,21 @@ def resize_img(img, size=DIM, pad=PAD):
 
 
 def read_img(img_path):
+    """Read image from disk
+
+    :param img_path: path to image
+    :return: loaded image as numpy array
+    """
     img = cv2.imread(img_path)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     return resize_img(img)
 
 
 def get_model():
+    """Get architecture of model
+
+    :return: tensorflow model
+    """
     model = tf.keras.Sequential([
         layers.Input(shape=(31, 31, 1)),
         layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=1),
@@ -69,6 +85,11 @@ def get_model():
 
 
 def get_summary(model=None, file="model_summary.txt"):
+    """Get a summary of a tensorflow model
+
+    :param model: tensorflow model, defaults to None
+    :param file: where to dump output, defaults to "model_summary.txt"
+    """
     if model is None:
         model = get_model()
     with open(file, "w") as f:
@@ -76,6 +97,12 @@ def get_summary(model=None, file="model_summary.txt"):
 
 
 def load_data(path, is_train):
+    """Load data from disk and into numpy array
+
+    :param path: path to data
+    :param is_train: whether it is training or testing data
+    :return: data
+    """
     set_type = "train" if is_train else "test"
     ant_ls = glob.glob(os.path.join(path, set_type, "ant/*"))
     text_ls = glob.glob(os.path.join(path, set_type, "text/*"))
@@ -93,6 +120,14 @@ def load_data(path, is_train):
 
 
 def get_test_metrics(model, X, y, verbose=VERBOSE):
+    """Run evaluation metrics
+
+    :param model: _description_
+    :param X: model inputs
+    :param y: ground truth labels
+    :param verbose: print debug, defaults to VERBOSE
+    :return: metric scores (see METRICS variable for order)
+    """
     y_pred = model.predict(X)
     y_pred = (y_pred > 0.5).astype(np.int64)
 
@@ -105,6 +140,15 @@ def get_test_metrics(model, X, y, verbose=VERBOSE):
 
 
 def run_model(X_train, X_val, y_train, y_val, plot_loss=False):
+    """Run training
+
+    :param X_train: input training data
+    :param X_val: input validation data
+    :param y_train: training labels
+    :param y_val: validation labels
+    :param plot_loss: whether to plot loss curve, defaults to False
+    :return: evaluation metrics
+    """
     model = get_model()
     model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.001), loss='binary_crossentropy', metrics=["accuracy"])
 
@@ -134,6 +178,12 @@ def run_model(X_train, X_val, y_train, y_val, plot_loss=False):
 
 
 def run_kfold(X, y, splits=10):
+    """Run cross-validation
+
+    :param X: input training data 
+    :param y: training labels
+    :param splits: number of folds, defaults to 10
+    """
     skf = StratifiedKFold(n_splits=splits, random_state=SEED, shuffle=True)
     scores = []
 
@@ -152,6 +202,8 @@ def run_kfold(X, y, splits=10):
 
 
 def print_scores():
+    """Prints all evaluation metrics
+    """
     scores = np.load(SCORES_FILE)
     print("---")
     print("accuracy, f1, recall, precision")
@@ -160,6 +212,8 @@ def print_scores():
 
 
 def run_train():
+    """Do cross-validation and save a final model
+    """
     X, y = load_data("imgs", is_train=True)
 
     run_kfold(X, y)
@@ -170,6 +224,10 @@ def run_train():
 
 
 def run_test(model_path):
+    """Run trained model on test set
+
+    :param model_path: path to trained model
+    """
     X_test, y_test = load_data("imgs", is_train=False)
     model = tf.keras.models.load_model(model_path)
     scores = get_test_metrics(model, X_test, y_test)

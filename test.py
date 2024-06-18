@@ -17,6 +17,10 @@ CLAMM_PATH = "../datasets/ICDAR2017_CLaMM_Training"
 
 
 def pick_n_random(n=6):
+    """Picks n number of images from the CLaMM dataset (check that we haven't picked them before)
+
+    :param n: number of images to pick, defaults to 6
+    """
     annotation_path = "annotations/*.tif"
     clamm_path = os.path.join(CLAMM_PATH, "*.tif")
 
@@ -54,6 +58,8 @@ def pick_n_random(n=6):
 
 
 def run_test():
+    """Run pipeline for an experiment
+    """
     for x in tqdm(glob.glob(os.path.join(TEST_PATH, "*.tif"))):
         cropped_img = run_pipeline(x)
         new_name = x.rsplit(".", 1)[0] + "_cut.png"
@@ -61,6 +67,14 @@ def run_test():
 
 
 def run_pipeline(x, plot=False, debug_save_name=None, use_ocr=False):
+    """Input an image into the pipeline
+
+    :param x: input image
+    :param plot: whether to plot image, defaults to False
+    :param debug_save_name: where to save plot, defaults to None
+    :param use_ocr: whether to apply the TrOCR model, defaults to False
+    :return: cropped image
+    """
     model = AnnotationClassifier("remover_model_v1_pad.keras", DIM, pad=True, plot=False)
     component_extractor = ComponentExtractor(x, plot=plot)
     annotation_remover = AnnotationRemover(component_extractor, model, plot=plot, verbose=True, use_ocr=use_ocr)
@@ -72,6 +86,11 @@ def run_pipeline(x, plot=False, debug_save_name=None, use_ocr=False):
     return cropped_img
 
 def get_results(path="test_imgs_final.csv", plot=True):
+    """Get results from experiments
+
+    :param path: path where to read data from (CSV file), defaults to "test_imgs_final.csv"
+    :param plot: whether to show bad examples, defaults to True
+    """
     df = pd.read_csv(path)
     comment_imgs = df[df["comment"] == "yes"]
     non_comment_imgs = df[df["comment"] == "no"]
